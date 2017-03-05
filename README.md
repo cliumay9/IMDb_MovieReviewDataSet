@@ -6,4 +6,4 @@ Then, we realize this algorithm is very computational heavy so we use out-of-cor
 For this reason, we use our second approach, out-of-core learning model. 
 
 In conclusion, despite the accuracy decreases for using out-of-core learning, 
-the run time significantly lowers as it took less than 1 minute while the classic approach takes about 30 minutes.
+the run time significantly lowers as it took less than 1 minute while the classic approach took about 30 minutes.
