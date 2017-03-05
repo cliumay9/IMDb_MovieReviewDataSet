@@ -42,7 +42,25 @@ for s in ('test','train'):
 df.columns = ['review', 'sentiment']
 # Note that df is well sorted based on how the file was extracted; we will shuffle df
 
+######## Employing bag-of-words model ###########
+'''We use bag-of-words model to act as a way to preprocess. That is, representing text as numerical
+feature vectors '''
+
+### Transform words into feature Vectors
+from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
+count = CountVectorizer()
+docs = np.array(['The sun is shining','The weather is sweet',
+                 'The sun is shining and the weather is sweet'])
+bag = count.fit_transform(docs)
+
+### Assessing word relvancy with term frequency-inverse document frequency
+from sklearn.feature_extraction.text import TfidfTransformer
+tfidf = TfidfTransformer()
+np.set_printoptions(precision =2)
+print(tfidf.fit_transform(count.fit_transform(docs)).toarray())
+
+
 np.random.seed(0) #Set seed to 0 to have same consistency
 df = df.reindex(np.random.permutation(df.index))
 df.to_csv('./movie_data.csv', index = False)
@@ -62,25 +80,96 @@ def preprocessor(text):
 # To test our preprocessor function work
 # res = preprocessor("</a>This :) is :( a test :-)!")
 # print('Preprocessor on "</a>This :) is :( a test :-)!":\n\n', res)
-df('review') = df['review'].apply(preprocessor)                
+df['review'] = df['review'].apply(preprocessor)                
 
-######## Employing bag-of-words model ###########
-'''We use bag-of-words model to act as a way to preprocess. That is, representing text as numerical
-feature vectors '''
+### Turn df to tokens with tokenizer_porter function
 
-'''
-from sklearn.feature_extraction.text import CountVectorizer
-count = CountVectorizer()
-docs = np.array([
-                 'The sun is shining',
-                 'The weather is sweet',
-                 'The sun is shining and the weather is sweet'])
-bag = count.fit_transform(docs)'''
+'''Define two function to tokenize with normal text.split and Porter Stemmer Algorithm, respectively. 
+Also, other algorithms like Snowball Stemmer or Lancaster Algorithm
+(http://www.nltk.org/api/nltk.stem.html)
+Use pip install nltk package'''
+# tokenizer vs tokenizer_porter
 
+def tokenizer(text):
+    return text.split()
+    
+from nltk.stem.porter import PorterStemmer
+porter = PorterStemmer()
+def tokenizer_porter(text):
+    x=[]
+    for word in text.split():
+        x.append(porter.stem(word))
+    return x
+# to test our tokenizer function
+# tokenizer_porter('runners like running and thus they run')
 
+### Remove stop words which are avaialable from the NLTK library
+# Stopwords
+import nltk
+nltk.download('stopwords')  #Obtain stopwords from the library
 
+from nltk.corpus import stopwords
+stop = stopwords.words('english')
 
+def removeStop(text):   
+    l = []
+    tp = tokenizer_porter(text)
+    for w in tp:
+        if w not in stop:
+            l.append(w)
+    return l
+removeStop('a runner likes running and runs a lot')
 
+# [w for w in tokenizer_porter('a runner likes running and runs a lot')[-10:] if w not in stop]
+# other way to write removeStop(text)
 
+'''Training a logistic regression model for document classification.'''
+# Divide the dataframe of cclean text documents into 25k for training and 25k testing
+X_train = df.loc[:25000, 'review'].values
+Y_train = df.loc[:25000, 'sentiment'].values
+X_test = df.loc[25000:, 'review'].values
+Y_test = df.loc[25000:, 'sentiment'].values
+
+# Use GridSearch to find the optimal set of parameters for the logistic regression model
+# using 5-fold stratified cross-validation
+from sklearn.grid_search import GridSearchCV
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+from sklearn.feature_extraction.text import TfidfVectorizer
+tfidf = TfidfVectorizer(strip_accents = None, lowercase = False,
+                        preprocessor = None)
+
+param_grid = [{'vect__ngram_range': [(1, 1)],
+               'vect__stop_words': [stop, None],
+               'vect__tokenizer': [tokenizer, tokenizer_porter],
+               'clf__penalty': ['l1', 'l2'],
+               'clf__C': [1.0, 10.0, 100.0]},
+              {'vect__ngram_range': [(1, 1)],
+               'vect__stop_words': [stop, None],
+               'vect__tokenizer': [tokenizer, tokenizer_porter],
+               'vect__use_idf':[False],
+               'vect__norm':[None],
+               'clf__penalty': ['l1', 'l2'],
+               'clf__C': [1.0, 10.0, 100.0]},
+              ]
+#Can add Third dictionary to see better determine which parameters are good for our Logistic regression model
+
+# Logistic Regression - Term Frequency-Inverse Document Frequency
+lr_tfidf = Pipeline([('vect',tfidf),
+                     ('clf', LogisticRegression(random_state = 0))])
+# Apply our set gridsearch to our logistic regression model
+gs_lr_tfidf = GridSearchCV(lr_tfidf, param_grid,
+                           scoring = 'accuracy',
+                           cv=5, verbose =1, 
+                           n_jobs = -1)
+# cv = number of fold
+gs_lr_tfidf.fit(X_train,Y_train)
+
+print('Best parameter set: %s ' % gs_lr_tfidf.best_params_)
+print('CV Accuracy: %.3f' % gs_lr_tfidf.best_score_) #Note: 89.2%
+##
+# Now apply our grid search LR model to predict test result and and determine its accuracy
+clf = gs_lr_tfidf.best_estimator_
+print('Test Accuracy: %.3f' % clf.score(X_test, Y_test)) # 89.7%
 
 
