@@ -259,6 +259,5 @@ print('Accuracy %.3f' % clf.score(X_test, Y_test)) #86.6%
 clf = clf.partial_fit(X_test, Y_test)
 
 
-    
 
 
