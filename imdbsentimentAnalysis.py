@@ -42,9 +42,11 @@ for s in ('test','train'):
 df.columns = ['review', 'sentiment']
 # Note that df is well sorted based on how the file was extracted; we will shuffle df
 
+## Bag-of-Words Approach ##
+
 ######## Employing bag-of-words model ###########
-'''We use bag-of-words model to act as a way to preprocess. That is, representing text as numerical
-feature vectors '''
+'''Turn Text into Feature Vectors
+We use bag-of-words model to act as a way to preprocess.  '''
 
 ### Transform words into feature Vectors
 from sklearn.feature_extraction.text import CountVectorizer
@@ -71,7 +73,7 @@ df.to_csv('./movie_data.csv', index = False)
 '''Define a function to clean data.'''
 import re
 def preprocessor(text):
-    text =re.sub('<[^>]*>', '', text)
+    text = re.sub('<[^>]*>', '', text)
     emojis = re.findall('(?::|;|=)(?:-)?(?:\)|\(|D|P)', text)
     text = re.sub('[\W]+',' ', text.lower()) +\
         ' '.join(emojis).replace('-','')
@@ -163,6 +165,7 @@ gs_lr_tfidf = GridSearchCV(lr_tfidf, param_grid,
                            cv=5, verbose =1, 
                            n_jobs = -1)
 # cv = number of fold
+# Fitting the training data into our gridsearch
 gs_lr_tfidf.fit(X_train,Y_train)
 
 print('Best parameter set: %s ' % gs_lr_tfidf.best_params_)
@@ -171,5 +174,91 @@ print('CV Accuracy: %.3f' % gs_lr_tfidf.best_score_) #Note: 89.2%
 # Now apply our grid search LR model to predict test result and and determine its accuracy
 clf = gs_lr_tfidf.best_estimator_
 print('Test Accuracy: %.3f' % clf.score(X_test, Y_test)) # 89.7%
+
+## Alternate Approach ##
+'''
+In order to make the algorithm to be less computation heavy, we stream the data
+This is called Out-of-core learning
+'''
+import numpy as np
+import re
+from nltk.corpus import stopwords
+stop = stopwords.words('english')
+    
+'''Define a funciton tokenizer that removes regular expressions
+ but not emojis while removing stopwords with stopwords library'''
+def tokenizer(text):
+    text =re.sub('<[^>]*>', '', text)
+    emojis = re.findall('(?::|;|=)(?:-)?(?:\)|\(|D|P)', text)
+    text = re.sub('[\W]+',' ', text.lower()) +\
+        ' '.join(emojis).replace('-','') 
+    tokenized = [w for w in text.split() if w not in stop]
+    return tokenized
+
+'''Define a stream document funcction that read a document and return a doc'''
+def stream_docs(path):
+    with open(path, 'r') as csv:
+        next(csv) #Skipping the header
+        for line in csv:
+            text, label = line[:-3], int(line[-2])
+            yield text, label
+
+# To test our stream_docs function, next(stream_docs(path = './movie_data.csv'))
+
+# Define a function that stream document with specified 'size'
+def get_minibatch(doc_stream, size):
+    docs, y =[],[]
+    try:
+        for _ in range(size):
+            text, label = next(doc_stream)
+            docs.append(text)
+            y.append(label)
+    except StopIteration:
+        return None, None
+    return docs, y
+
+'''We cannot use CountVectorizer and Tfidfvectorizer 
+as they require to hold either the complete vocabulary or keeping
+all feature vecotrs in memory to calculate the counterpart
+Thus, we use HashingVectorizer since it is data-independent
+(This algorithm use hashing trick via 32bit MurmurHash3 Algorithm,
+sites.google.com/site/murmurhash)
+'''            
+from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.linear_model import SGDClassifier
+vect = HashingVectorizer(decode_error = 'ignore',
+                         n_features = 2**21,
+                         preprocessor = None,
+                         tokenizer = tokenizer)
+clf = SGDClassifier(loss = 'log', random_state = 0, n_iter=1)
+doc_stream = stream_docs(path= './movie_data.csv')
+# Note: Increasing n_features avoid hash collision 
+# But increase number of coefficients in the logistic regression model
+'''
+Out-of-core learning executing
+'''
+## Use training set to train our out-of-core learning algorithm
+import pyprind
+pbar = pyprind.ProgBar(45) #To set up a bar for the estimated time for our algorithm
+classes = np.array ([0,1])
+for _ in range(45):
+    X_train, Y_train = get_minibatch(doc_stream, size =1000)
+    # exceuting 45 minibatches and each batch contains 1000 documents
+    if not X_train:
+        break
+    X_train = vect.transform(X_train) # Transforming our X_train to our SGDC classifier with Hashing
+    clf. partial_fit(X_train, Y_train, classes = classes)
+    # Fitting (partially) with our training set to our model
+    pbar.update()
+# Use the test set to evaluate our model's performance
+X_test, Y_test = get_minibatch(doc_stream, size = 5000)
+X_test = vect.transform(X_test)
+print('Accuracy %.3f' % clf.score(X_test, Y_test)) #86.6%
+
+# use the test test to update our model
+clf = clf.partial_fit(X_test, Y_test)
+
+
+    
 
 
