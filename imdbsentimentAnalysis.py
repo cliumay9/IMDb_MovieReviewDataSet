@@ -46,7 +46,10 @@ df.columns = ['review', 'sentiment']
 
 ######## Employing bag-of-words model ###########
 '''Turn Text into Feature Vectors
-We use bag-of-words model to act as a way to preprocess.  '''
+We use bag-of-words model to act as a way to preprocess. 
+Then we use grid-search to determine which parameters and which model 
+create optimal results
+ '''
 
 ### Transform words into feature Vectors
 from sklearn.feature_extraction.text import CountVectorizer
