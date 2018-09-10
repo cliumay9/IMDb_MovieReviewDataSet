@@ -3,6 +3,7 @@ import theano
 import pyprind
 import pandas as pd
 import os
+
 '''Movie Revieww data set was downloaded from http://ai.stanford.edu/~amaas/data/sentiment/
 @InProceedings{maas-EtAl:2011:ACL-HLT2011,
   author    = {Maas, Andrew L.  and  Daly, Raymond E.  and  Pham, Peter T.  and  Huang, Dan  and  Ng, Andrew Y.  and  Potts, Christopher},
@@ -26,6 +27,8 @@ import os
 
 pbar = pyprind.ProgBar(50000)
 labels = {'pos':1,'neg':0}
+
+#create a pandas' dataframe object
 df = pd.DataFrame()
 for s in ('test','train'):
     for l in ('pos', 'neg'):
