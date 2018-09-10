@@ -1,5 +1,6 @@
 # IMDb_MovieReviewDataSet
 Conducting Sentiment Analysis on the IMDb Movie review dataset.
+Before solving the problem, we use pandas to clean our data.
 We First approach this problem with a classic bag-of-words model; 
 we use gridsearch algorithm to fit the dataset into a logistic regression model. 
 Then, we realize this algorithm is very computational heavy so we use out-of-core learning model
